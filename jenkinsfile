@@ -11,7 +11,7 @@ pipeline {
     stages {
         stage('Clone Repo') {
             steps {
-                git url: 'https://github.com/bhushantayade888/python-app-cicd.git', branch: 'mainr'
+                git url: 'https://github.com/bhushantayade888/python-app-cicd.git', branch: 'main'
             }
         }
 
