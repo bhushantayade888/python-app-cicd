@@ -2,59 +2,68 @@ pipeline {
     agent any
 
     environment {
-        SSH_CRED = 'node-app-key'
-        SERVER_IP = '3.21.207.226'
+        SSH_CRED   = 'node-app-key'
+        SERVER_IP  = '172.31.18.59'
         REMOTE_USER = 'ubuntu'
-        APP_DIR = '/home/ubuntu/pythonapp'
-        REPO_URL = 'https://github.com/bhushantayade888/python-app-cicd.git'
-        BRANCH = 'main'
+        APP_DIR    = '/home/ubuntu/pythonapp'
     }
 
     stages {
 
-        stage('Deploy to Server') {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/bhushantayade888/python-app-cicd.git'
+            }
+        }
+
+        stage('Deploy Code to EC2') {
             steps {
                 sshagent(credentials: ["${SSH_CRED}"]) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} '
-                        
-                        # Install packages only if not installed
-                        if ! command -v python3-venv >/dev/null 2>&1; then
-                            sudo apt update
-                            sudo apt install -y python3-venv python3-pip git
-                        fi
+                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} "mkdir -p ${APP_DIR}"
+                        scp -o StrictHostKeyChecking=no -r * ${REMOTE_USER}@${SERVER_IP}:${APP_DIR}/
+                    """
+                }
+            }
+        }
 
-                        # Clone repo if first time
-                        if [ ! -d "${APP_DIR}" ]; then
-                            git clone -b ${BRANCH} ${REPO_URL} ${APP_DIR}
-                        else
-                            cd ${APP_DIR}
-                            git pull origin ${BRANCH}
-                        fi
+        stage('Install Dependencies & Start App') {
+            steps {
+                sshagent(credentials: ["${SSH_CRED}"]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${SERVER_IP} << EOF
+                        sudo apt update -y
+                        sudo apt install -y python3-venv python3-pip
 
                         cd ${APP_DIR}
 
-                        # Create virtual environment only if not exists
-                        if [ ! -d "venv" ]; then
-                            python3 -m venv venv
-                        fi
-
+                        python3 -m venv venv
                         source venv/bin/activate
 
                         pip install --upgrade pip
                         pip install -r requirements.txt
 
-                        # Kill old app if running
-                        pkill -f app.py || true
+                        # Kill old process if running
+                        pkill -f gunicorn || true
 
-                        # Run app in background
-                        nohup python3 app.py --host=0.0.0.0 > app.log 2>&1 &
+                        # Start app using gunicorn
+                        nohup gunicorn --bind 0.0.0.0:5000 app:app > app.log 2>&1 &
 
-                        echo "Deployment Successful 🚀"
-                    '
+                        exit
+                        EOF
                     """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment Successful 🚀"
+        }
+        failure {
+            echo "Deployment Failed ❌"
         }
     }
 }
