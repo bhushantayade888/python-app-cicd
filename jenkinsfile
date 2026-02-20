@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         SSH_CRED = 'node-app-key'
-        SERVER_IP = '172.31.18.59'
+        SERVER_IP = '3.21.207.226'
         REMOTE_USER = 'ubuntu'
         APP_DIR = '/home/ubuntu/pythonapp'
         REPO_URL = 'https://github.com/bhushantayade888/python-app-cicd.git'
